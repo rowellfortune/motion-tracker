@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import type { HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { MotionTracker, toGrayscale, type MotionOptions, type Point } from '../motion/motionCore';
+import { createHandLandmarker, detectHands } from '../hand/handTracker';
+import { drawHandSkeleton } from '../hand/handSkeleton';
+import { createPoseLandmarker, detectPose } from '../body/poseTracker';
+import { drawBodySkeleton } from '../body/bodySkeleton';
 
 /** Processing resolution. Smaller is faster; detection works well at this size. */
 const PROC_WIDTH = 160;
@@ -8,6 +13,9 @@ const PROC_HEIGHT = 120;
 const TRAIL_LENGTH = 60;
 /** Send stats to the parent every N frames to avoid re-rendering on every frame. */
 const STATS_EVERY_N_FRAMES = 6;
+/** Colors for the stick figure and each hand. */
+const BODY_COLOR = '#3ddc97';
+const HAND_COLORS = ['#4bbdc5', '#ffb347'];
 
 /** Live numbers shown in the sidebar. */
 export interface MotionStats {
@@ -21,27 +29,41 @@ interface MotionViewProps {
   options: MotionOptions;
   showMask: boolean;
   showTrail: boolean;
+  showBody: boolean;
+  showHands: boolean;
   onStats: (stats: MotionStats) => void;
 }
 
 /**
- * Shows the webcam feed with a motion overlay drawn on top.
- * Owns the camera stream, the animation loop and the tracker instance.
- * @param props Current detection settings, display toggles and a stats callback.
+ * Shows the webcam feed with a motion overlay and an optional stick figure on top.
+ * Owns the camera stream, the animation loop and the trackers.
+ * @param props Detection settings, display toggles and a stats callback.
  */
-export default function MotionView({ options, showMask, showTrail, onStats }: MotionViewProps) {
+export default function MotionView({
+  options,
+  showMask,
+  showTrail,
+  showBody,
+  showHands,
+  onStats,
+}: MotionViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [modelStatus, setModelStatus] = useState<string | null>(null);
 
   // Refs hold the latest props so the animation loop reads fresh values without restarting.
   const optionsRef = useRef(options);
   const showMaskRef = useRef(showMask);
   const showTrailRef = useRef(showTrail);
+  const showBodyRef = useRef(showBody);
+  const showHandsRef = useRef(showHands);
   const onStatsRef = useRef(onStats);
   optionsRef.current = options;
   showMaskRef.current = showMask;
   showTrailRef.current = showTrail;
+  showBodyRef.current = showBody;
+  showHandsRef.current = showHands;
   onStatsRef.current = onStats;
 
   useEffect(() => {
@@ -73,19 +95,22 @@ export default function MotionView({ options, showMask, showTrail, onStats }: Mo
     let lastFpsTime = performance.now();
     let fps = 0;
 
+    // Model instances start as null and fill in once their downloads finish.
+    let poseLandmarker: PoseLandmarker | null = null;
+    let handLandmarker: HandLandmarker | null = null;
+
     /**
      * Draws the mask, box, centroid and trail onto the overlay for one frame.
      * @param result The latest motion result from the tracker.
      * @param scaleX Horizontal ratio from processing pixels to overlay pixels.
      * @param scaleY Vertical ratio from processing pixels to overlay pixels.
      */
-    const drawOverlay = (
+    const drawMotion = (
       result: ReturnType<MotionTracker['process']>,
       scaleX: number,
       scaleY: number,
     ) => {
       if (!overlayCtx || !maskCtx) return;
-      overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
       // Optional mask layer: paint moving pixels green, then stretch the small image over the overlay.
       if (showMaskRef.current) {
@@ -140,6 +165,32 @@ export default function MotionView({ options, showMask, showTrail, onStats }: Mo
     };
 
     /**
+     * Runs pose and hand detection on the video frame and draws the skeletons.
+     * Skipped entirely when both toggles are off or the models are not loaded yet.
+     * @param timestampMs Monotonic time in milliseconds for the model.
+     */
+    const drawSkeletons = (timestampMs: number) => {
+      if (!overlayCtx) return;
+      const width = overlay.width;
+      const height = overlay.height;
+
+      // Upper body: one person, drawn as a single stick figure.
+      if (showBodyRef.current && poseLandmarker) {
+        const pose = detectPose(poseLandmarker, video, timestampMs);
+        const person = pose.landmarks[0];
+        if (person) drawBodySkeleton(overlayCtx, person, width, height, BODY_COLOR);
+      }
+
+      // Hands: each detected hand gets its own color.
+      if (showHandsRef.current && handLandmarker) {
+        const hands = detectHands(handLandmarker, video, timestampMs);
+        hands.landmarks.forEach((hand, index) => {
+          drawHandSkeleton(overlayCtx, hand, width, height, HAND_COLORS[index % HAND_COLORS.length]);
+        });
+      }
+    };
+
+    /**
      * Runs once per animation frame: reads the video, detects motion, draws the overlay.
      * @param now High-resolution timestamp supplied by requestAnimationFrame.
      */
@@ -168,7 +219,10 @@ export default function MotionView({ options, showMask, showTrail, onStats }: Mo
           trail.shift();
         }
 
-        drawOverlay(result, overlay.width / PROC_WIDTH, overlay.height / PROC_HEIGHT);
+        // Clear once per frame, then draw the motion layer and the skeletons on top.
+        overlayCtx?.clearRect(0, 0, overlay.width, overlay.height);
+        drawMotion(result, overlay.width / PROC_WIDTH, overlay.height / PROC_HEIGHT);
+        drawSkeletons(now);
 
         // Count frames per second once every second.
         frameCount++;
@@ -192,8 +246,31 @@ export default function MotionView({ options, showMask, showTrail, onStats }: Mo
     };
 
     /**
+     * Downloads the pose and hand models. Runs in the background so the camera and
+     * motion detection start right away. A failure here only disables the skeletons.
+     */
+    const loadModels = async () => {
+      try {
+        setModelStatus('Loading body and hand models...');
+        // Load both models in parallel to cut the wait.
+        const [pose, hand] = await Promise.all([createPoseLandmarker(), createHandLandmarker()]);
+        if (cancelled) {
+          pose.close();
+          hand.close();
+          return;
+        }
+        poseLandmarker = pose;
+        handLandmarker = hand;
+        setModelStatus(null);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'unknown error';
+        setModelStatus(`Skeleton models failed to load: ${message}`);
+      }
+    };
+
+    /**
      * Asks the browser for the webcam, attaches it to the video element and starts the loop.
-     * Runs once on mount. Permission or device errors are shown to the user.
+     * Permission or device errors are shown to the user.
      */
     const start = async () => {
       try {
@@ -216,18 +293,22 @@ export default function MotionView({ options, showMask, showTrail, onStats }: Mo
     };
 
     void start();
+    void loadModels();
 
-    // Cleanup: stop the loop and release the camera when the component unmounts.
+    // Cleanup: stop the loop, release the camera and free the model memory on unmount.
     return () => {
       cancelled = true;
       cancelAnimationFrame(frameId);
       stream?.getTracks().forEach((t) => t.stop());
+      poseLandmarker?.close();
+      handLandmarker?.close();
     };
   }, []);
 
   return (
     <div className="stage">
       {error && <p className="error">{error}</p>}
+      {modelStatus && <p className="notice">{modelStatus}</p>}
       <div className="stage-inner">
         {/* The video is mirrored with CSS so it feels like a mirror. The overlay mirrors too, so both line up. */}
         <video ref={videoRef} className="feed" playsInline muted />

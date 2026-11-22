@@ -128,3 +128,13 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
   .layout { grid-template-columns: 1fr; }
   .app { padding: 16px; }
 }
+
+/* Status line for model downloads. Sits under the error area and stays readable in both themes. */
+.notice {
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}

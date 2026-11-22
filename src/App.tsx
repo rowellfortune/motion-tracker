@@ -17,6 +17,8 @@ export default function App() {
   const [options, setOptions] = useState<MotionOptions>(DEFAULT_OPTIONS);
   const [showMask, setShowMask] = useState(false);
   const [showTrail, setShowTrail] = useState(true);
+  const [showBody, setShowBody] = useState(true);
+  const [showHands, setShowHands] = useState(true);
   const [stats, setStats] = useState<MotionStats>({ motionPercent: 0, fps: 0, hasMotion: false });
 
   /**
@@ -41,7 +43,14 @@ export default function App() {
       </header>
 
       <main className="layout">
-        <MotionView options={options} showMask={showMask} showTrail={showTrail} onStats={setStats} />
+        <MotionView
+          options={options}
+          showMask={showMask}
+          showTrail={showTrail}
+          showBody={showBody}
+          showHands={showHands}
+          onStats={setStats}
+        />
 
         <aside className="panel">
           <section className="card">
@@ -97,6 +106,14 @@ export default function App() {
             <label className="toggle">
               <input type="checkbox" checked={showTrail} onChange={(e) => setShowTrail(e.target.checked)} />
               Show movement trail
+            </label>
+            <label className="toggle">
+              <input type="checkbox" checked={showBody} onChange={(e) => setShowBody(e.target.checked)} />
+              Show upper body stick figure
+            </label>
+            <label className="toggle">
+              <input type="checkbox" checked={showHands} onChange={(e) => setShowHands(e.target.checked)} />
+              Show hand skeleton
             </label>
           </section>
         </aside>
