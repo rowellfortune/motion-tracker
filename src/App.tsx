@@ -19,6 +19,7 @@ export default function App() {
   const [showTrail, setShowTrail] = useState(true);
   const [showBody, setShowBody] = useState(true);
   const [showHands, setShowHands] = useState(true);
+  const [showFace, setShowFace] = useState(true);
   const [stats, setStats] = useState<MotionStats>({ motionPercent: 0, fps: 0, hasMotion: false });
 
   /**
@@ -49,6 +50,7 @@ export default function App() {
           showTrail={showTrail}
           showBody={showBody}
           showHands={showHands}
+          showFace={showFace}
           onStats={setStats}
         />
 
@@ -114,6 +116,10 @@ export default function App() {
             <label className="toggle">
               <input type="checkbox" checked={showHands} onChange={(e) => setShowHands(e.target.checked)} />
               Show hand skeleton
+            </label>
+            <label className="toggle">
+              <input type="checkbox" checked={showFace} onChange={(e) => setShowFace(e.target.checked)} />
+              Show face outline
             </label>
           </section>
         </aside>

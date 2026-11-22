@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
+import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { MotionTracker, toGrayscale, type MotionOptions, type Point } from '../motion/motionCore';
 import { createHandLandmarker, detectHands } from '../hand/handTracker';
 import { drawHandSkeleton } from '../hand/handSkeleton';
 import { createPoseLandmarker, detectPose } from '../body/poseTracker';
 import { drawBodySkeleton } from '../body/bodySkeleton';
+import { createFaceLandmarker, detectFace } from '../face/faceTracker';
+import { drawFaceSkeleton } from '../face/faceSkeleton';
 
 /** Processing resolution. Smaller is faster; detection works well at this size. */
 const PROC_WIDTH = 160;
@@ -16,6 +18,8 @@ const STATS_EVERY_N_FRAMES = 6;
 /** Colors for the stick figure and each hand. */
 const BODY_COLOR = '#3ddc97';
 const HAND_COLORS = ['#4bbdc5', '#ffb347'];
+/** Color for the face outline. */
+const FACE_COLOR = '#ff8fd1';
 
 /** Live numbers shown in the sidebar. */
 export interface MotionStats {
@@ -31,6 +35,7 @@ interface MotionViewProps {
   showTrail: boolean;
   showBody: boolean;
   showHands: boolean;
+  showFace: boolean;
   onStats: (stats: MotionStats) => void;
 }
 
@@ -45,6 +50,7 @@ export default function MotionView({
   showTrail,
   showBody,
   showHands,
+  showFace,
   onStats,
 }: MotionViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -58,12 +64,14 @@ export default function MotionView({
   const showTrailRef = useRef(showTrail);
   const showBodyRef = useRef(showBody);
   const showHandsRef = useRef(showHands);
+  const showFaceRef = useRef(showFace);
   const onStatsRef = useRef(onStats);
   optionsRef.current = options;
   showMaskRef.current = showMask;
   showTrailRef.current = showTrail;
   showBodyRef.current = showBody;
   showHandsRef.current = showHands;
+  showFaceRef.current = showFace;
   onStatsRef.current = onStats;
 
   useEffect(() => {
@@ -98,6 +106,7 @@ export default function MotionView({
     // Model instances start as null and fill in once their downloads finish.
     let poseLandmarker: PoseLandmarker | null = null;
     let handLandmarker: HandLandmarker | null = null;
+    let faceLandmarker: FaceLandmarker | null = null;
 
     /**
      * Draws the mask, box, centroid and trail onto the overlay for one frame.
@@ -188,6 +197,13 @@ export default function MotionView({
           drawHandSkeleton(overlayCtx, hand, width, height, HAND_COLORS[index % HAND_COLORS.length]);
         });
       }
+
+      // Face: one face outlined with eyes and lips.
+      if (showFaceRef.current && faceLandmarker) {
+        const face = detectFace(faceLandmarker, video, timestampMs);
+        const first = face.faceLandmarks[0];
+        if (first) drawFaceSkeleton(overlayCtx, first, width, height, FACE_COLOR);
+      }
     };
 
     /**
@@ -251,16 +267,22 @@ export default function MotionView({
      */
     const loadModels = async () => {
       try {
-        setModelStatus('Loading body and hand models...');
+        setModelStatus('Loading body, hand and face models...');
         // Load both models in parallel to cut the wait.
-        const [pose, hand] = await Promise.all([createPoseLandmarker(), createHandLandmarker()]);
+        const [pose, hand, face] = await Promise.all([
+          createPoseLandmarker(),
+          createHandLandmarker(),
+          createFaceLandmarker(),
+        ]);
         if (cancelled) {
           pose.close();
           hand.close();
+          face.close();
           return;
         }
         poseLandmarker = pose;
         handLandmarker = hand;
+        faceLandmarker = face;
         setModelStatus(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'unknown error';
@@ -302,6 +324,7 @@ export default function MotionView({
       stream?.getTracks().forEach((t) => t.stop());
       poseLandmarker?.close();
       handLandmarker?.close();
+      faceLandmarker?.close();
     };
   }, []);
 
