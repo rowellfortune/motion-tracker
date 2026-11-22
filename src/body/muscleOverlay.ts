@@ -29,11 +29,20 @@ const MUSCLES: MuscleSpec[] = [
   { name: 'triceps', from: 12, to: 14, offset: -0.08, thickness: 0.14 },
   { name: 'forearm', from: 13, to: 15, offset: 0, thickness: 0.12 },
   { name: 'forearm', from: 14, to: 16, offset: 0, thickness: 0.12 },
+  // Second forearm layer on the opposite side, for the flexors and extensors.
+  { name: 'forearm', from: 13, to: 15, offset: 0.1, thickness: 0.08 },
+  { name: 'forearm', from: 14, to: 16, offset: -0.1, thickness: 0.08 },
   // Legs
   { name: 'quadriceps', from: 23, to: 25, offset: 0, thickness: 0.2 },
   { name: 'quadriceps', from: 24, to: 26, offset: 0, thickness: 0.2 },
   { name: 'calf', from: 25, to: 27, offset: 0.02, thickness: 0.16 },
   { name: 'calf', from: 26, to: 28, offset: 0.02, thickness: 0.16 },
+  // Hamstrings: back of the thigh, opposite the quads.
+  { name: 'hamstring', from: 23, to: 25, offset: -0.1, thickness: 0.17 },
+  { name: 'hamstring', from: 24, to: 26, offset: 0.1, thickness: 0.17 },
+  // Shin: front of the lower leg, opposite the calves.
+  { name: 'shin', from: 25, to: 27, offset: -0.06, thickness: 0.07 },
+  { name: 'shin', from: 26, to: 28, offset: 0.06, thickness: 0.07 },
 ];
 
 /** Colors by muscle group, so each group reads as one region. */
@@ -43,6 +52,8 @@ const COLORS: Record<string, string> = {
   forearm: 'rgba(255, 205, 86, 0.45)',
   quadriceps: 'rgba(75, 192, 192, 0.45)',
   calf: 'rgba(54, 162, 235, 0.45)',
+  hamstring: 'rgba(153, 220, 120, 0.45)',
+  shin: 'rgba(120, 180, 255, 0.4)',
   chest: 'rgba(153, 102, 255, 0.4)',
   deltoid: 'rgba(255, 90, 60, 0.4)',
   core: 'rgba(255, 255, 255, 0.35)',
