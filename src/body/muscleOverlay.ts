@@ -45,7 +45,7 @@ const COLORS: Record<string, string> = {
   calf: 'rgba(54, 162, 235, 0.45)',
   chest: 'rgba(153, 102, 255, 0.4)',
   deltoid: 'rgba(255, 90, 60, 0.4)',
-  core: 'rgba(201, 203, 207, 0.35)',
+  core: 'rgba(255, 255, 255, 0.35)',
 };
 
 /**
@@ -114,30 +114,58 @@ export function drawMuscleOverlay(
     drawBoneMuscle(ctx, p, q, spec, width, height);
   }
 
-  // Chest: a wide ellipse between the shoulders and the hips' midline.
+  // Chest and core share one torso frame, so they follow the body when it leans.
   const ls = landmarks[11];
   const rs = landmarks[12];
   const lh = landmarks[23];
   const rh = landmarks[24];
   if (visible(ls) && visible(rs) && visible(lh) && visible(rh)) {
+    // Torso corners in pixel space.
     const topX = ((ls.x + rs.x) / 2) * width;
     const topY = ((ls.y + rs.y) / 2) * height;
     const botX = ((lh.x + rh.x) / 2) * width;
     const botY = ((lh.y + rh.y) / 2) * height;
-    const cx = (topX + botX) / 2;
-    const cy = (topY + botY) / 2 - (botY - topY) * 0.1;
     const shoulderWidth = Math.hypot((ls.x - rs.x) * width, (ls.y - rs.y) * height);
     const torsoLength = Math.hypot(botX - topX, botY - topY);
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, shoulderWidth * 0.5, torsoLength * 0.22, Math.atan2(botY - topY, botX - topX) - Math.PI / 2, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.chest;
-    ctx.fill();
+    if (torsoLength < 1) return;
 
-    // Core: a narrower band down the center of the torso.
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + torsoLength * 0.1, shoulderWidth * 0.2, torsoLength * 0.3, Math.atan2(botY - topY, botX - topX) - Math.PI / 2, 0, Math.PI * 2);
+    // Local frame: origin at the torso center, +y pointing down the torso, +x to the body's side.
+    const cx = (topX + botX) / 2;
+    const cy = (topY + botY) / 2;
+    const down = Math.atan2(botY - topY, botX - topX) - Math.PI / 2;
+    const halfWidth = shoulderWidth / 2;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(down);
+
+    // Pectorals: two fan shapes, one per side, sitting just under the shoulder line.
+    const pecY = -torsoLength * 0.22;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(side * halfWidth * 0.5, pecY, halfWidth * 0.55, torsoLength * 0.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS.chest;
+      ctx.fill();
+    }
+
+    // Abs: a 2 by 3 grid of rounded blocks, from just under the chest to the hip line.
+    const blockW = halfWidth * 0.42;
+    const blockH = torsoLength * 0.12;
+    const gap = torsoLength * 0.03;
+    const rows = 3;
+    const gridTop = -torsoLength * 0.02;
     ctx.fillStyle = COLORS.core;
-    ctx.fill();
+    for (let row = 0; row < rows; row++) {
+      for (const side of [-1, 1]) {
+        const x = side * halfWidth * 0.22 - blockW / 2;
+        const y = gridTop + row * (blockH + gap);
+        ctx.beginPath();
+        ctx.roundRect(x, y, blockW, blockH, blockW * 0.3);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
   }
 
   // Deltoids: a cap over each shoulder joint.
