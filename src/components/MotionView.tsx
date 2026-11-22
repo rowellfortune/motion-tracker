@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
+import type { Detection, FaceLandmarker, HandLandmarker, ObjectDetector, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { MotionTracker, toGrayscale, type MotionOptions, type Point } from '../motion/motionCore';
 import { createHandLandmarker, detectHands } from '../hand/handTracker';
 import { drawHandSkeleton } from '../hand/handSkeleton';
@@ -7,6 +7,8 @@ import { createPoseLandmarker, detectPose } from '../body/poseTracker';
 import { drawBodySkeleton } from '../body/bodySkeleton';
 import { createFaceLandmarker, detectFace } from '../face/faceTracker';
 import { drawFaceSkeleton } from '../face/faceSkeleton';
+import { createObjectDetector, detectObjects } from '../object/objectTracker';
+import { drawObjectBoxes } from '../object/objectOverlay';
 
 /** Processing resolution. Smaller is faster; detection works well at this size. */
 const PROC_WIDTH = 160;
@@ -20,6 +22,10 @@ const BODY_COLOR = '#3ddc97';
 const HAND_COLORS = ['#4bbdc5', '#ffb347'];
 /** Color for the face outline. */
 const FACE_COLOR = '#ff8fd1';
+/** Color for object boxes. */
+const OBJECT_COLOR = '#ffd84d';
+/** Object detection is heavier than the others, so it runs every N frames and reuses the last result. */
+const OBJECT_EVERY_N_FRAMES = 3;
 
 /** Live numbers shown in the sidebar. */
 export interface MotionStats {
@@ -36,6 +42,7 @@ interface MotionViewProps {
   showBody: boolean;
   showHands: boolean;
   showFace: boolean;
+  showObjects: boolean;
   onStats: (stats: MotionStats) => void;
 }
 
@@ -51,6 +58,7 @@ export default function MotionView({
   showBody,
   showHands,
   showFace,
+  showObjects,
   onStats,
 }: MotionViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -65,6 +73,7 @@ export default function MotionView({
   const showBodyRef = useRef(showBody);
   const showHandsRef = useRef(showHands);
   const showFaceRef = useRef(showFace);
+  const showObjectsRef = useRef(showObjects);
   const onStatsRef = useRef(onStats);
   optionsRef.current = options;
   showMaskRef.current = showMask;
@@ -72,6 +81,7 @@ export default function MotionView({
   showBodyRef.current = showBody;
   showHandsRef.current = showHands;
   showFaceRef.current = showFace;
+  showObjectsRef.current = showObjects;
   onStatsRef.current = onStats;
 
   useEffect(() => {
@@ -107,6 +117,9 @@ export default function MotionView({
     let poseLandmarker: PoseLandmarker | null = null;
     let handLandmarker: HandLandmarker | null = null;
     let faceLandmarker: FaceLandmarker | null = null;
+    let objectDetector: ObjectDetector | null = null;
+    // Last object result, reused on frames where detection is skipped.
+    let lastObjects: Detection[] = [];
 
     /**
      * Draws the mask, box, centroid and trail onto the overlay for one frame.
@@ -204,6 +217,14 @@ export default function MotionView({
         const first = face.faceLandmarks[0];
         if (first) drawFaceSkeleton(overlayCtx, first, width, height, FACE_COLOR);
       }
+
+      // Objects: run detection every few frames, and draw the last result on every frame.
+      if (showObjectsRef.current && objectDetector) {
+        if (frameCount % OBJECT_EVERY_N_FRAMES === 0) {
+          lastObjects = detectObjects(objectDetector, video, timestampMs);
+        }
+        drawObjectBoxes(overlayCtx, lastObjects, OBJECT_COLOR);
+      }
     };
 
     /**
@@ -267,22 +288,25 @@ export default function MotionView({
      */
     const loadModels = async () => {
       try {
-        setModelStatus('Loading body, hand and face models...');
+        setModelStatus('Loading body, hand, face and object models...');
         // Load both models in parallel to cut the wait.
-        const [pose, hand, face] = await Promise.all([
+        const [pose, hand, face, object] = await Promise.all([
           createPoseLandmarker(),
           createHandLandmarker(),
           createFaceLandmarker(),
+          createObjectDetector(),
         ]);
         if (cancelled) {
           pose.close();
           hand.close();
           face.close();
+          object.close();
           return;
         }
         poseLandmarker = pose;
         handLandmarker = hand;
         faceLandmarker = face;
+        objectDetector = object;
         setModelStatus(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'unknown error';
@@ -325,6 +349,7 @@ export default function MotionView({
       poseLandmarker?.close();
       handLandmarker?.close();
       faceLandmarker?.close();
+      objectDetector?.close();
     };
   }, []);
 

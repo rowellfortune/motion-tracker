@@ -20,6 +20,7 @@ export default function App() {
   const [showBody, setShowBody] = useState(true);
   const [showHands, setShowHands] = useState(true);
   const [showFace, setShowFace] = useState(true);
+  const [showObjects, setShowObjects] = useState(true);
   const [stats, setStats] = useState<MotionStats>({ motionPercent: 0, fps: 0, hasMotion: false });
 
   /**
@@ -51,6 +52,7 @@ export default function App() {
           showBody={showBody}
           showHands={showHands}
           showFace={showFace}
+          showObjects={showObjects}
           onStats={setStats}
         />
 
@@ -120,6 +122,10 @@ export default function App() {
             <label className="toggle">
               <input type="checkbox" checked={showFace} onChange={(e) => setShowFace(e.target.checked)} />
               Show face outline
+            </label>
+            <label className="toggle">
+              <input type="checkbox" checked={showObjects} onChange={(e) => setShowObjects(e.target.checked)} />
+              Recognize objects
             </label>
           </section>
         </aside>
