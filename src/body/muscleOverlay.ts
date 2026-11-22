@@ -22,6 +22,12 @@ interface MuscleSpec {
  * 11/12 shoulders, 13/14 elbows, 15/16 wrists, 23/24 hips, 25/26 knees, 27/28 ankles.
  */
 const MUSCLES: MuscleSpec[] = [
+  // Neck: sternocleidomastoid runs from the ear down to the front of the shoulder.
+  { name: 'neck', from: 7, to: 11, offset: 0.05, thickness: 0.06 },
+  { name: 'neck', from: 8, to: 12, offset: -0.05, thickness: 0.06 },
+  // Trapezius: the upper back muscle that runs from the neck out to the shoulder.
+  { name: 'trapezius', from: 7, to: 11, offset: -0.12, thickness: 0.1 },
+  { name: 'trapezius', from: 8, to: 12, offset: 0.12, thickness: 0.1 },
   // Arms
   { name: 'biceps', from: 11, to: 13, offset: -0.05, thickness: 0.16 },
   { name: 'biceps', from: 12, to: 14, offset: 0.05, thickness: 0.16 },
@@ -56,6 +62,8 @@ const COLORS: Record<string, string> = {
   shin: 'rgba(120, 180, 255, 0.4)',
   chest: 'rgba(153, 102, 255, 0.4)',
   deltoid: 'rgba(255, 90, 60, 0.4)',
+  neck: 'rgba(255, 120, 200, 0.45)',
+  trapezius: 'rgba(180, 140, 255, 0.4)',
   core: 'rgba(255, 255, 255, 0.35)',
 };
 
