@@ -1,0 +1,130 @@
+/* Color tokens. Dark theme by default, light theme when the OS asks for it. */
+:root {
+  --bg: #0b0f14;
+  --panel: #131a22;
+  --border: #1f2a36;
+  --text: #e8edf2;
+  --muted: #8a98a8;
+  --accent: #ff5a3c;
+  --ok: #3ddc97;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --border: #dde3ea;
+    --text: #15202b;
+    --muted: #5d6b7a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* Explicit body background so the page never flashes white or transparent. */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.app { min-height: 100vh; padding: 16px; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.header h1 { font-size: 1.4rem; margin: 0; }
+
+.status {
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.status-live { color: var(--ok); border-color: var(--ok); }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* Camera stage keeps the video at 4:3 and stacks the overlay exactly on top. */
+.stage { position: relative; }
+.stage-inner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  transform: scaleX(-1); /* Mirror the feed. */
+}
+.feed, .overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.overlay { pointer-events: none; }
+
+.error {
+  color: var(--accent);
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.panel { display: flex; flex-direction: column; gap: 12px; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.card h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.metric { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.metric-value { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.metric-label { color: var(--muted); font-size: 0.85rem; }
+
+.slider-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.slider-head { display: flex; justify-content: space-between; font-size: 0.9rem; }
+.slider-head output { color: var(--accent); font-variant-numeric: tabular-nums; }
+.slider-row small { color: var(--muted); font-size: 0.78rem; }
+input[type='range'] { width: 100%; accent-color: var(--accent); }
+
+.toggle { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 0.92rem; }
+
+.button {
+  width: 100%;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.button:hover { border-color: var(--accent); }
+
+/* Phones and narrow tablets: stack the panel under the camera, with a 16px gutter. */
+@media (max-width: 800px) {
+  .layout { grid-template-columns: 1fr; }
+  .app { padding: 16px; }
+}
