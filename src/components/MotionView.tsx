@@ -5,6 +5,7 @@ import { createHandLandmarker, detectHands } from '../hand/handTracker';
 import { drawHandSkeleton } from '../hand/handSkeleton';
 import { createPoseLandmarker, detectPose } from '../body/poseTracker';
 import { drawBodySkeleton } from '../body/bodySkeleton';
+import { drawMuscleOverlay } from '../body/muscleOverlay';
 import { createFaceLandmarker, detectFace } from '../face/faceTracker';
 import { drawFaceSkeleton } from '../face/faceSkeleton';
 import { createObjectDetector, detectObjects } from '../object/objectTracker';
@@ -43,6 +44,7 @@ interface MotionViewProps {
   showHands: boolean;
   showFace: boolean;
   showObjects: boolean;
+  showMuscles: boolean;
   onStats: (stats: MotionStats) => void;
 }
 
@@ -59,6 +61,7 @@ export default function MotionView({
   showHands,
   showFace,
   showObjects,
+  showMuscles,
   onStats,
 }: MotionViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -74,6 +77,7 @@ export default function MotionView({
   const showHandsRef = useRef(showHands);
   const showFaceRef = useRef(showFace);
   const showObjectsRef = useRef(showObjects);
+  const showMusclesRef = useRef(showMuscles);
   const onStatsRef = useRef(onStats);
   optionsRef.current = options;
   showMaskRef.current = showMask;
@@ -82,6 +86,7 @@ export default function MotionView({
   showHandsRef.current = showHands;
   showFaceRef.current = showFace;
   showObjectsRef.current = showObjects;
+  showMusclesRef.current = showMuscles;
   onStatsRef.current = onStats;
 
   useEffect(() => {
@@ -197,10 +202,15 @@ export default function MotionView({
       const height = overlay.height;
 
       // Upper body: one person, drawn as a single stick figure.
-      if (showBodyRef.current && poseLandmarker) {
+      // Pose runs once when either the stick figure or the muscle overlay is on.
+      if ((showBodyRef.current || showMusclesRef.current) && poseLandmarker) {
         const pose = detectPose(poseLandmarker, video, timestampMs);
         const person = pose.landmarks[0];
-        if (person) drawBodySkeleton(overlayCtx, person, width, height, BODY_COLOR);
+        if (person) {
+          // Muscles go underneath so the stick figure stays readable on top.
+          if (showMusclesRef.current) drawMuscleOverlay(overlayCtx, person, width, height);
+          if (showBodyRef.current) drawBodySkeleton(overlayCtx, person, width, height, BODY_COLOR);
+        }
       }
 
       // Hands: each detected hand gets its own color.
